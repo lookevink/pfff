@@ -425,6 +425,32 @@ export function validateExpirationRules(userId: string | null, expiresIn: string
 
 ### Type Safety Standards
 
+#### 0. Type Layer Boundaries (CRITICAL)
+
+**Never mix domain types with serialized types.** Follow these strict boundaries:
+
+| Layer | Type to Use | Example |
+|-------|-------------|---------|
+| **DAO** | `PasteRow`, `PasteInsert`, `PasteUpdate` | Raw Supabase types |
+| **Repository/Service** | `Paste` (domain model) | Has `Date` objects |
+| **API Routes** | Return `PasteApiResponse` | Serialized (ISO strings) |
+| **Server Components** | `PasteApiResponse` | Fetches from API |
+| **Client Components** | `PasteApiResponse` | Receives serialized props |
+
+**Why?** Next.js serializes data between server and client. `Date` objects become strings, so components must expect strings.
+
+```typescript
+// ❌ WRONG: Client component using domain type
+export function PasteViewer({ paste }: { paste: Paste }) {
+  console.log(paste.createdAt.getFullYear()) // RUNTIME ERROR: not a Date!
+}
+
+// ✅ CORRECT: Client component using API type
+export function PasteViewer({ paste }: { paste: PasteApiResponse }) {
+  console.log(new Date(paste.createdAt).getFullYear()) // Works!
+}
+```
+
 #### 1. Use Supabase Auto-Generated Types
 **ALWAYS** use Supabase-generated types as the source of truth for database schema:
 
