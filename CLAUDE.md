@@ -128,7 +128,11 @@ The code must render immediately. AI explanations load separately to avoid block
 </Suspense>
 ```
 
-## Database Schema
+## Database Schema & Migrations
+
+### Schema Overview
+
+All database migrations are stored in `db/` directory and should be run in order.
 
 ```sql
 create table public.pastes (
@@ -143,6 +147,7 @@ create table public.pastes (
 
   created_at timestamptz default now(),
   expires_at timestamptz,         -- Nullable = "Forever"
+  view_count bigint default 0,    -- Atomic increment via function
 
   -- CRITICAL: Anonymous users must have expiration
   constraint check_anonymous_expiration check (
@@ -150,6 +155,40 @@ create table public.pastes (
   )
 );
 ```
+
+### Database Functions
+
+#### Atomic View Counter
+For operations requiring atomicity (like view counts), use PostgreSQL functions:
+
+```sql
+create or replace function public.increment_view_count(paste_id bigint)
+returns void
+language plpgsql
+security definer
+as $$
+begin
+  update public.pastes
+  set view_count = view_count + 1
+  where id = paste_id;
+end;
+$$;
+```
+
+**Usage in DAO:**
+```typescript
+async incrementViewCount(id: number): Promise<void> {
+  await supabaseAdmin.rpc('increment_view_count', { paste_id: id })
+}
+```
+
+### Migration Standards
+
+1. **File naming**: `NNN_descriptive_name.sql` (e.g., `001_create_pastes_table.sql`)
+2. **Include comments**: Explain what the migration does and why
+3. **Use `if not exists`**: Make migrations idempotent when possible
+4. **Document functions**: Add `comment on function` for clarity
+5. **Grant permissions**: Explicitly grant to relevant roles (service_role, authenticated, anon)
 
 ## Business Logic Constraints
 
@@ -209,13 +248,238 @@ SELECT cron.schedule(
 
 The anonymous user constraint ensures junk data always expires, preventing database bloat.
 
+## Code Organization Standards
+
+### Layered Architecture (MANDATORY)
+
+This project uses a strict separation of concerns across 4 layers:
+
+```
+lib/
+├── db/
+│   ├── daos/           # Data Access Objects - Pure SQL/ORM operations
+│   └── repositories/   # Domain-specific data access with business logic
+├── services/           # Orchestration layer (coordinates DAOs, Redis, webhooks)
+├── validators/         # Input validation + business rule enforcement
+└── [clients]           # External service clients (Redis, Supabase, etc.)
+
+app/
+├── api/                # REST API endpoints (thin controllers)
+└── [pages]             # Next.js pages (UI only)
+```
+
+### Layer Responsibilities
+
+#### 1. DAO Layer (`lib/db/daos/*.dao.ts`)
+**Purpose**: Raw database operations with zero business logic
+
+**Rules**:
+- ONE DAO per database table
+- Methods are simple CRUD operations: `insert()`, `findBySlug()`, `update()`, `delete()`
+- NO validation, NO business rules, NO external service calls
+- Accept already-validated data
+- Return raw database records or `null`
+- Use PostgreSQL functions (via `.rpc()`) for atomic operations
+
+**Example**:
+```typescript
+// lib/db/daos/paste.dao.ts
+export class PasteDAO {
+  async insert(data: PasteInsert): Promise<PasteRow> { ... }
+  async findBySlug(slug: string): Promise<PasteRow | null> { ... }
+
+  // Use RPC for atomic operations
+  async incrementViewCount(id: number): Promise<void> {
+    await supabaseAdmin.rpc('increment_view_count', { paste_id: id })
+  }
+
+  async deleteExpired(): Promise<number> { ... }
+}
+```
+
+#### 2. Repository Layer (`lib/db/repositories/*.repository.ts`)
+**Purpose**: Domain-specific data access with transformation logic
+
+**Rules**:
+- Wraps DAOs with domain models
+- Transforms database rows into domain objects
+- Handles complex queries that span multiple tables
+- NO external services (Redis, webhooks) - only database
+- Can call validators before passing to DAO
+
+**Example**:
+```typescript
+// lib/db/repositories/paste.repository.ts
+export class PasteRepository {
+  constructor(private dao: PasteDAO) {}
+
+  async createPaste(input: CreatePasteInput): Promise<Paste> {
+    // Validate, call DAO, transform to domain model
+  }
+
+  async getPasteBySlug(slug: string): Promise<Paste | null> {
+    const row = await this.dao.findBySlug(slug)
+    return row ? this.toDomainModel(row) : null
+  }
+}
+```
+
+#### 3. Service Layer (`lib/services/*.service.ts`)
+**Purpose**: Orchestrate multiple operations across systems
+
+**Rules**:
+- Coordinate DAOs, Redis, webhooks, external APIs
+- Implement full business workflows (e.g., "create paste with caching")
+- Handle distributed transactions
+- Called by API routes/Server Actions
+
+**Example**:
+```typescript
+// lib/services/paste.service.ts
+export class PasteService {
+  async createPasteWithCaching(input: CreatePasteInput): Promise<PasteResult> {
+    // 1. Rate limit (Redis)
+    // 2. Validate (Validator)
+    // 3. Generate ID (Redis INCR + Hashids)
+    // 4. Insert (Repository/DAO)
+    // 5. Cache (Redis)
+    // 6. Emit webhook
+  }
+
+  async getPasteWithCache(slug: string): Promise<Paste | null> {
+    // 1. Check Redis cache
+    // 2. On miss, query Repository
+    // 3. Cache result
+  }
+}
+```
+
+#### 4. Schema Layer (`lib/schemas/*.schema.ts`)
+**Purpose**: Define Zod schemas for runtime validation
+
+**Rules**:
+- Use Zod for all input validation
+- Single source of truth for validation logic
+- Export TypeScript types inferred from schemas
+- Keep schemas close to the domain they validate
+
+**Example**:
+```typescript
+// lib/schemas/paste.schema.ts
+import { z } from 'zod'
+
+export const createPasteSchema = z.object({
+  content: z.string().min(1).max(100 * 1024),
+  language: z.enum(['javascript', 'typescript', ...]).optional().default('text'),
+  expiresIn: z.enum(['1h', '1d', '7d', 'never']).optional().default('7d'),
+  userId: z.string().uuid().nullable().optional(),
+})
+
+// Infer TypeScript type from schema
+export type CreatePasteInput = z.infer<typeof createPasteSchema>
+```
+
+#### 5. Validator Layer (`lib/validators/*.validator.ts`)
+**Purpose**: Use Zod schemas + business rule enforcement
+
+**Rules**:
+- Wrap Zod schemas for validation
+- Enforce business rules (e.g., anonymous user constraints)
+- Provide helper functions (expiration calculation, etc.)
+- NO database calls, NO external services
+
+**Example**:
+```typescript
+// lib/validators/paste.validator.ts
+import { createPasteSchema } from '@/lib/schemas/paste.schema'
+
+export function validateCreatePasteInput(input: unknown) {
+  return createPasteSchema.parse(input) // Throws ZodError if invalid
+}
+
+export function validateExpirationRules(userId: string | null, expiresIn: string): void {
+  if (!userId && expiresIn === 'never') {
+    throw new Error('Anonymous users must set expiration')
+  }
+}
+```
+
+#### 6. API Routes (`app/api/*/route.ts`)
+**Purpose**: Thin HTTP controllers
+
+**Rules**:
+- Parse request → Call service → Return response
+- NO business logic (delegate to services)
+- Handle HTTP concerns only (headers, status codes, JSON parsing)
+- Catch and format Zod validation errors
+
+### When to Use Each Layer
+
+| Task | Layer | Example |
+|------|-------|---------|
+| Insert a record | DAO | `pasteDAO.insert(data)` |
+| Fetch with transformation | Repository | `pasteRepo.getPasteBySlug(slug)` |
+| Create paste with rate limit + cache | Service | `pasteService.createPasteWithCaching(input)` |
+| Validate input size | Validator | `validatePasteInput(input)` |
+| Handle HTTP request | API Route | `POST /api/pastes` |
+
+### Type Safety Standards
+
+#### 1. Use Supabase Auto-Generated Types
+**ALWAYS** use Supabase-generated types as the source of truth for database schema:
+
+```typescript
+// types/paste.types.ts
+import { Database } from './database.types'
+
+// Use Supabase types, don't duplicate them
+export type PasteRow = Database['public']['Tables']['pastes']['Row']
+export type PasteInsert = Database['public']['Tables']['pastes']['Insert']
+export type PasteUpdate = Database['public']['Tables']['pastes']['Update']
+```
+
+**Regenerate types after schema changes:**
+```bash
+npx supabase gen types typescript --project-id "jowgpljfoscedeebvhdb" --schema public > types/database.types.ts
+```
+
+#### 2. Use Zod for Validation + Type Inference
+**ALWAYS** use Zod schemas for runtime validation with TypeScript type inference:
+
+```typescript
+// Define schema
+export const createPasteSchema = z.object({
+  content: z.string().min(1),
+  language: z.enum([...]).optional(),
+})
+
+// Infer TypeScript type (single source of truth)
+export type CreatePasteInput = z.infer<typeof createPasteSchema>
+```
+
+**Benefits:**
+- Runtime validation + compile-time types
+- Single source of truth (schema defines both validation and types)
+- Better error messages for API consumers
+- Automatic type safety when schema changes
+
+### Anti-Patterns (DO NOT DO)
+
+❌ Business logic in API routes
+❌ Redis/webhook calls in DAOs
+❌ Database queries in services (use DAOs/Repositories)
+❌ Validation logic scattered across files
+❌ Direct DAO calls from API routes (use services)
+❌ Manual type definitions that duplicate database schema
+❌ Validation without Zod (unless performance-critical)
+❌ Throwing generic errors from validators (use Zod's structured errors)
+
 ## Next.js App Router Structure
 
 - `app/layout.tsx` - Root layout with Geist fonts
 - `app/page.tsx` - Homepage
 - `app/globals.css` - Tailwind styles + CSS variables
-- Server Actions should live in `app/actions/` (create if needed)
-- API routes (if needed) in `app/api/`
+- `app/api/` - REST API endpoints (thin controllers only)
 
 ## Environment Variables Required
 
