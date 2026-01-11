@@ -4,9 +4,19 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { createPasteSchema, SUPPORTED_LANGUAGES, EXPIRATION_OPTIONS } from '@/lib/schemas/paste.schema'
+import { SUPPORTED_LANGUAGES, EXPIRATION_OPTIONS } from '@/lib/schemas/paste.schema'
 import type { CreatePasteInput } from '@/lib/schemas/paste.schema'
-import { Textarea } from '@/components/ui/textarea'
+import type { DetectionResult } from '@/lib/detection/types'
+import { z } from 'zod'
+
+// Form-specific schema with required fields for react-hook-form
+const pasteFormSchema = z.object({
+  content: z.string().min(1).max(100 * 1024),
+  language: z.enum(SUPPORTED_LANGUAGES),
+  expiresIn: z.enum(EXPIRATION_OPTIONS),
+})
+
+type PasteFormInput = z.infer<typeof pasteFormSchema>
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,20 +28,22 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Loader2, FileCode } from 'lucide-react'
+import { CodeEditor } from './code-editor'
+import { FormatButton } from './format-button'
 
 export function PasteForm() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null)
 
   const {
-    register,
     handleSubmit,
     watch,
     setValue,
     formState: { errors },
-  } = useForm<CreatePasteInput>({
-    resolver: zodResolver(createPasteSchema),
+  } = useForm<PasteFormInput>({
+    resolver: zodResolver(pasteFormSchema),
     defaultValues: {
       content: '',
       language: 'text',
@@ -40,10 +52,33 @@ export function PasteForm() {
   })
 
   const content = watch('content')
-  const contentSize = new TextEncoder().encode(content).length
-  const maxSize = 100 * 1024 // 100KB
+  const language = watch('language')
 
-  const onSubmit = async (data: CreatePasteInput) => {
+  const handleLanguageDetected = (language: string, result: DetectionResult) => {
+    setDetectionResult(result)
+    // Auto-update language field if confidence is high
+    if (result.confidence >= 0.7) {
+      setValue('language', language as any)
+    }
+  }
+
+  const handleFormat = (formattedCode: string) => {
+    setValue('content', formattedCode)
+  }
+
+  const onSubmit = async (data: PasteFormInput) => {
+    // Convert form data to API format
+    const payload: CreatePasteInput = {
+      content: data.content,
+      language: data.language,
+      expiresIn: data.expiresIn,
+      metadata: {
+        clientVersion: '2.0.0',
+        detectedLanguage: detectionResult?.language,
+        languageConfidence: detectionResult?.confidence,
+        languageDetector: detectionResult?.detector,
+      },
+    }
     setIsSubmitting(true)
     setError(null)
 
@@ -53,13 +88,7 @@ export function PasteForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...data,
-          metadata: {
-            clientVersion: '1.0.0',
-            languageDetector: 'manual',
-          },
-        }),
+        body: JSON.stringify(payload),
       })
 
       const result = await response.json()
@@ -91,23 +120,25 @@ export function PasteForm() {
 
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Content Textarea */}
+          {/* Code Editor with Auto-Detection */}
           <div className="space-y-2">
-            <Label htmlFor="content">
-              Content
-              <span className="ml-2 text-xs text-muted-foreground">
-                ({(contentSize / 1024).toFixed(1)}KB / {maxSize / 1024}KB)
-              </span>
-            </Label>
-            <Textarea
-              id="content"
-              placeholder="Paste your code here..."
-              className="min-h-[400px] font-mono text-sm resize-y"
-              {...register('content')}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="content">Content</Label>
+              <FormatButton
+                code={content}
+                language={language}
+                onFormat={handleFormat}
+                disabled={isSubmitting}
+              />
+            </div>
+            <CodeEditor
+              value={content}
+              onChange={(value) => setValue('content', value)}
+              onLanguageDetected={handleLanguageDetected}
+              error={errors.content?.message}
+              disabled={isSubmitting}
+              isAuthenticated={false} // TODO: Connect to auth system
             />
-            {errors.content && (
-              <p className="text-sm text-destructive">{errors.content.message}</p>
-            )}
           </div>
 
           {/* Language Select */}
@@ -115,7 +146,7 @@ export function PasteForm() {
             <div className="space-y-2">
               <Label htmlFor="language">Language</Label>
               <Select
-                defaultValue="text"
+                value={language}
                 onValueChange={(value) => setValue('language', value as any)}
               >
                 <SelectTrigger id="language">
