@@ -9,6 +9,7 @@ import {
   shouldUseObjectStorage,
 } from '@/lib/validators/paste.validator'
 import { Paste } from '@/types/paste.types'
+import type { Json } from '@/types/database.types'
 
 interface CachedPaste {
   content: string
@@ -73,6 +74,7 @@ export class PasteService {
       user_id: validatedInput.userId ?? null,
       ip_hash: hashIP(ip),
       expires_at: expiresAt,
+      metadata: (validatedInput.metadata ?? null) as Json | null,
     })
 
     // 7. Cache in Redis for fast reads
@@ -191,6 +193,8 @@ export class PasteService {
       createdAt: new Date(cached.created_at),
       expiresAt: cached.expires_at ? new Date(cached.expires_at) : null,
       viewCount: 0, // Not cached
+      lastViewedAt: null, // Not cached
+      metadata: null, // Not cached
     }
   }
 

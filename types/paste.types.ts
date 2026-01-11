@@ -26,6 +26,8 @@ export interface Paste {
   createdAt: Date // Transformed from string
   expiresAt: Date | null // Transformed from string
   viewCount: number // Never null in domain model
+  lastViewedAt: Date | null // Transformed from string
+  metadata: PasteRow['metadata'] // JSONB metadata
 }
 
 // Re-export for convenience

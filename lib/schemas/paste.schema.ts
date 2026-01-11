@@ -43,6 +43,38 @@ export const SUPPORTED_LANGUAGES = [
 export const EXPIRATION_OPTIONS = ['1h', '1d', '7d', 'never'] as const
 
 /**
+ * Schema for paste metadata (flexible client data)
+ */
+export const pasteMetadataSchema = z.object({
+  // Client information
+  clientVersion: z.string().optional(),
+
+  // Language detection (from client)
+  detectedLanguage: z.string().optional(),
+  languageConfidence: z.number().min(0).max(1).optional(), // 0-1 confidence score
+  languageDetector: z.string().optional(), // e.g., "highlight.js", "linguist", "manual"
+
+  // Editor settings at time of creation
+  editorSettings: z.object({
+    lineNumbers: z.boolean().optional(),
+    wordWrap: z.boolean().optional(),
+    fontSize: z.number().min(8).max(32).optional(),
+    theme: z.enum(['dark', 'light', 'auto']).optional(),
+  }).optional(),
+
+  // Custom tags
+  tags: z.array(z.string().max(50)).max(10).optional(),
+
+  // Any additional custom data (unvalidated)
+  custom: z.record(z.string(), z.unknown()).optional(),
+}).optional()
+
+/**
+ * Infer TypeScript type for metadata
+ */
+export type PasteMetadata = z.infer<typeof pasteMetadataSchema>
+
+/**
  * Schema for creating a paste
  */
 export const createPasteSchema = z.object({
@@ -71,6 +103,8 @@ export const createPasteSchema = z.object({
     .uuid('Invalid user ID format')
     .nullable()
     .optional(),
+
+  metadata: pasteMetadataSchema,
 })
 
 /**

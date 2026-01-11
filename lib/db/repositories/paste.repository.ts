@@ -26,6 +26,8 @@ export class PasteRepository {
       createdAt: new Date(row.created_at),
       expiresAt: row.expires_at ? new Date(row.expires_at) : null,
       viewCount: row.view_count ?? 0,
+      lastViewedAt: row.last_viewed_at ? new Date(row.last_viewed_at) : null,
+      metadata: row.metadata ?? null,
     }
   }
 
