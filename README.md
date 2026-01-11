@@ -56,6 +56,12 @@ pnpm start
 pnpm lint
 ```
 
+#### Type Generation
+
+```bash
+npx -y supabase gen types typescript --project-id "jowgpljfoscedeebvhdb" --schema public > types/database.types.ts
+```
+
 ## UI Component System
 
 This project uses **shadcn/ui** with Tailwind CSS v4.
@@ -78,3 +84,4 @@ We use Redis atomic increments + Hashids to generate short, unique, and URL-safe
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Supabase Documentation](https://supabase.com/docs)
 - [Upstash Redis Documentation](https://upstash.com/docs/redis/overall/getstarted)
+
