@@ -22,6 +22,8 @@ export type Database = {
           id: number
           ip_hash: string | null
           language: string | null
+          last_viewed_at: string | null
+          metadata: Json | null
           slug: string
           storage_path: string | null
           user_id: string | null
@@ -34,6 +36,8 @@ export type Database = {
           id?: number
           ip_hash?: string | null
           language?: string | null
+          last_viewed_at?: string | null
+          metadata?: Json | null
           slug: string
           storage_path?: string | null
           user_id?: string | null
@@ -46,10 +50,54 @@ export type Database = {
           id?: number
           ip_hash?: string | null
           language?: string | null
+          last_viewed_at?: string | null
+          metadata?: Json | null
           slug?: string
           storage_path?: string | null
           user_id?: string | null
           view_count?: number | null
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          default_expiration: string | null
+          default_language: string | null
+          editor_theme: string | null
+          enable_ai_analysis: boolean | null
+          enable_line_numbers: boolean | null
+          enable_syntax_highlighting: boolean | null
+          metadata: Json | null
+          notify_on_paste_expiry: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_expiration?: string | null
+          default_language?: string | null
+          editor_theme?: string | null
+          enable_ai_analysis?: boolean | null
+          enable_line_numbers?: boolean | null
+          enable_syntax_highlighting?: boolean | null
+          metadata?: Json | null
+          notify_on_paste_expiry?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_expiration?: string | null
+          default_language?: string | null
+          editor_theme?: string | null
+          enable_ai_analysis?: boolean | null
+          enable_line_numbers?: boolean | null
+          enable_syntax_highlighting?: boolean | null
+          metadata?: Json | null
+          notify_on_paste_expiry?: boolean | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
