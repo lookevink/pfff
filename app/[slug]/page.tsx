@@ -3,7 +3,7 @@ import { PasteViewer } from '@/components/paste/paste-viewer'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
-import { PasteApiResponse } from '@/types/paste.types'
+import { pasteService } from '@/lib/services/paste.service'
 import { highlightCode } from '@/lib/highlighting/syntax-highlighter'
 
 interface PageProps {
@@ -12,24 +12,9 @@ interface PageProps {
   }>
 }
 
-async function getPaste(slug: string): Promise<PasteApiResponse | null> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-
-  const response = await fetch(`${baseUrl}/api/pastes/${slug}`, {
-    cache: 'no-store', // Always fetch fresh data
-  })
-
-  if (!response.ok) {
-    return null
-  }
-
-  const result = await response.json()
-  return result.success ? result.data : null
-}
-
 export default async function PastePage({ params }: PageProps) {
   const { slug } = await params
-  const paste = await getPaste(slug)
+  const paste = await pasteService.getPaste(slug)
 
   if (!paste) {
     notFound()
@@ -53,8 +38,8 @@ export default async function PastePage({ params }: PageProps) {
         slug={paste.slug}
         content={paste.content}
         language={paste.language}
-        createdAt={paste.createdAt}
-        expiresAt={paste.expiresAt}
+        createdAt={paste.createdAt.toISOString()}
+        expiresAt={paste.expiresAt?.toISOString() ?? null}
         viewCount={paste.viewCount}
         highlightedHtml={highlighted.html}
       />
