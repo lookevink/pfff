@@ -2,11 +2,15 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { FileCode, Calendar, Eye, Copy, Check } from 'lucide-react'
 import { useState } from 'react'
 import { PasteApiResponse } from '@/types/paste.types'
+import { CodeDisplay } from './code-display'
 
-type PasteViewerProps = Pick<PasteApiResponse, 'slug' | 'content' | 'language' | 'createdAt' | 'expiresAt' | 'viewCount'>
+type PasteViewerProps = Pick<PasteApiResponse, 'slug' | 'content' | 'language' | 'createdAt' | 'expiresAt' | 'viewCount'> & {
+  highlightedHtml?: string
+}
 
 export function PasteViewer({
   slug,
@@ -15,6 +19,7 @@ export function PasteViewer({
   createdAt,
   expiresAt,
   viewCount,
+  highlightedHtml,
 }: PasteViewerProps) {
   const [copied, setCopied] = useState(false)
 
@@ -82,19 +87,25 @@ export function PasteViewer({
       </CardHeader>
 
       <CardContent>
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground uppercase">
-              {language}
-            </span>
+            <Badge variant="outline" className="text-xs">
+              {language.toUpperCase()}
+            </Badge>
             <span className="text-xs text-muted-foreground">
               {(new TextEncoder().encode(content).length / 1024).toFixed(1)}KB
             </span>
           </div>
 
-          <pre className="p-4 bg-zinc-100 dark:bg-zinc-900 rounded-md overflow-x-auto">
-            <code className="text-sm font-mono">{content}</code>
-          </pre>
+          <div className="rounded-md border overflow-hidden">
+            <CodeDisplay
+              code={content}
+              language={language}
+              highlightedHtml={highlightedHtml}
+              showLineNumbers={true}
+              className="text-sm"
+            />
+          </div>
         </div>
       </CardContent>
     </Card>

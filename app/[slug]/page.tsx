@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { PasteApiResponse } from '@/types/paste.types'
+import { highlightCode } from '@/lib/highlighting/syntax-highlighter'
 
 interface PageProps {
   params: Promise<{
@@ -34,6 +35,9 @@ export default async function PastePage({ params }: PageProps) {
     notFound()
   }
 
+  // Server-side syntax highlighting for fast initial render
+  const highlighted = highlightCode(paste.content, paste.language)
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-12 px-4">
       <div className="max-w-4xl mx-auto mb-6">
@@ -52,6 +56,7 @@ export default async function PastePage({ params }: PageProps) {
         createdAt={paste.createdAt}
         expiresAt={paste.expiresAt}
         viewCount={paste.viewCount}
+        highlightedHtml={highlighted.html}
       />
     </div>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -30,12 +30,16 @@ import {
 import { Loader2, FileCode } from 'lucide-react'
 import { CodeEditor } from './code-editor'
 import { FormatButton } from './format-button'
+import { ViewModeToggle, type ViewMode } from './view-mode-toggle'
+import { LivePreview } from './live-preview'
+import { Textarea } from '@/components/ui/textarea'
 
 export function PasteForm() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('editor')
 
   const {
     handleSubmit,
@@ -61,6 +65,19 @@ export function PasteForm() {
       setValue('language', language as any)
     }
   }
+
+  // Trigger detection in preview/split modes too
+  useEffect(() => {
+    if ((viewMode === 'preview' || viewMode === 'split') && content && !detectionResult) {
+      import('@/lib/detection/detector-factory').then(({ DetectorFactory }) => {
+        DetectorFactory.getDetector().then((detector) => {
+          detector.detect(content).then((result) => {
+            handleLanguageDetected(result.language, result)
+          })
+        })
+      })
+    }
+  }, [viewMode, content, detectionResult])
 
   const handleFormat = (formattedCode: string) => {
     setValue('content', formattedCode)
@@ -120,25 +137,77 @@ export function PasteForm() {
 
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Code Editor with Auto-Detection */}
+          {/* Code Editor with View Modes */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="content">Content</Label>
-              <FormatButton
-                code={content}
-                language={language}
-                onFormat={handleFormat}
-                disabled={isSubmitting}
-              />
+              <div className="flex items-center gap-2">
+                <ViewModeToggle
+                  mode={viewMode}
+                  onModeChange={setViewMode}
+                  disabled={isSubmitting}
+                />
+                <FormatButton
+                  code={content}
+                  language={language}
+                  onFormat={handleFormat}
+                  disabled={isSubmitting}
+                />
+              </div>
             </div>
-            <CodeEditor
-              value={content}
-              onChange={(value) => setValue('content', value)}
-              onLanguageDetected={handleLanguageDetected}
-              error={errors.content?.message}
-              disabled={isSubmitting}
-              isAuthenticated={false} // TODO: Connect to auth system
-            />
+
+            {/* Editor Only Mode */}
+            {viewMode === 'editor' && (
+              <CodeEditor
+                value={content}
+                onChange={(value) => setValue('content', value)}
+                onLanguageDetected={handleLanguageDetected}
+                error={errors.content?.message}
+                disabled={isSubmitting}
+                isAuthenticated={false} // TODO: Connect to auth system
+              />
+            )}
+
+            {/* Preview Only Mode */}
+            {viewMode === 'preview' && (
+              <div className="relative rounded-md border overflow-hidden min-h-[400px]">
+                <LivePreview
+                  code={content}
+                  language={language}
+                  showLineNumbers={true}
+                />
+              </div>
+            )}
+
+            {/* Split View Mode */}
+            {viewMode === 'split' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Editor</Label>
+                  <Textarea
+                    value={content}
+                    onChange={(e) => setValue('content', e.target.value)}
+                    placeholder="Paste your code here..."
+                    disabled={isSubmitting}
+                    className={`font-mono min-h-[400px] ${errors.content ? 'border-destructive' : ''}`}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Preview</Label>
+                  <div className="relative rounded-md border overflow-hidden min-h-[400px]">
+                    <LivePreview
+                      code={content}
+                      language={language}
+                      showLineNumbers={true}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {errors.content && (
+              <p className="text-sm text-destructive">{errors.content.message}</p>
+            )}
           </div>
 
           {/* Language Select */}
