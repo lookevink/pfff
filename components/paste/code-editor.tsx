@@ -16,16 +16,18 @@ interface CodeEditorProps {
   error?: string
   disabled?: boolean
   isAuthenticated?: boolean
+  autoFocus?: boolean
 }
 
 export function CodeEditor({
   value,
   onChange,
   onLanguageDetected,
-  placeholder = 'Paste your code here...',
+  placeholder = 'Paste here...',
   error,
   disabled = false,
   isAuthenticated = false,
+  autoFocus = false,
 }: CodeEditorProps) {
   const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null)
   const [isDetecting, setIsDetecting] = useState(false)
@@ -91,6 +93,7 @@ export function CodeEditor({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         disabled={disabled}
+        autoFocus={autoFocus}
         className={`font-mono min-h-[400px] ${error ? 'border-destructive' : ''}`}
       />
 

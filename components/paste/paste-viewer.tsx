@@ -3,10 +3,19 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { FileCode, Calendar, Eye, Copy, Check } from 'lucide-react'
 import { useState } from 'react'
 import { PasteApiResponse } from '@/types/paste.types'
 import { CodeDisplay } from './code-display'
+import { useAppHotkeys } from '@/hooks/use-app-hotkeys'
+import { useRouter } from 'next/navigation'
+// import { useToast } from '@/hooks/use-toast'
 
 type PasteViewerProps = Pick<PasteApiResponse, 'slug' | 'content' | 'language' | 'createdAt' | 'expiresAt' | 'viewCount'> & {
   highlightedHtml?: string
@@ -21,6 +30,8 @@ export function PasteViewer({
   viewCount,
   highlightedHtml,
 }: PasteViewerProps) {
+  const router = useRouter()
+  // const { toast } = useToast() // Commenting out until I find the hook
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -28,6 +39,29 @@ export function PasteViewer({
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  // Hotkey for copying
+  useAppHotkeys('meta+c, ctrl+c', (e) => {
+    e.preventDefault()
+    handleCopy()
+  })
+
+  // Hotkey for creating new paste from clipboard
+  useAppHotkeys('meta+v, ctrl+v', async (e) => {
+    e.preventDefault()
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+      if (!clipboardText.trim()) return
+
+      // Save to localStorage and redirect to home
+      localStorage.setItem('paste_draft', clipboardText)
+      router.push('/')
+      
+    } catch (error) {
+       console.error('Failed to read clipboard:', error)
+    }
+  })
+
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
@@ -65,24 +99,33 @@ export function PasteViewer({
             </CardDescription>
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopy}
-            className="flex items-center gap-2"
-          >
-            {copied ? (
-              <>
-                <Check className="w-4 h-4" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4" />
-                Copy
-              </>
-            )}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopy}
+                  className="flex items-center gap-2"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Press <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100"><span className="text-xs">⌘</span>C</kbd></p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </CardHeader>
 

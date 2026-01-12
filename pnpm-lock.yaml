@@ -53,6 +53,9 @@ importers:
       react-hook-form:
         specifier: ^7.71.0
         version: 7.71.0(react@19.2.3)
+      react-hotkeys-hook:
+        specifier: ^5.2.1
+        version: 5.2.1(react-dom@19.2.3)(react@19.2.3)
       shadcn:
         specifier: ^3.6.3
         version: 3.6.3(@types/node@20.19.28)(hono@4.11.3)(typescript@5.9.3)
@@ -6392,6 +6395,16 @@ packages:
       react: 19.2.3
     dev: false
 
+  /react-hotkeys-hook@5.2.1(react-dom@19.2.3)(react@19.2.3):
+    resolution: {integrity: sha512-xbKh6zJxd/vJHT4Bw4+0pBD662Fk20V+VFhLqciCg+manTVO4qlqRqiwFOYelfHN9dBvWj9vxaPkSS26ZSIJGg==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+    dependencies:
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+    dev: false
+
   /react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
     dev: true
@@ -6613,6 +6626,7 @@ packages:
 
   /safe-buffer@5.2.1:
     resolution: {integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==}
+    requiresBuild: true
     dev: false
 
   /safe-push-apply@1.0.0:

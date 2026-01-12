@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { SUPPORTED_LANGUAGES, EXPIRATION_OPTIONS } from '@/lib/schemas/paste.schema'
+import { useAppHotkeys } from '@/hooks/use-app-hotkeys'
 import type { CreatePasteInput } from '@/lib/schemas/paste.schema'
 import type { DetectionResult } from '@/lib/detection/types'
 import { z } from 'zod'
@@ -29,10 +30,10 @@ import {
 } from '@/components/ui/select'
 import { Loader2, FileCode } from 'lucide-react'
 import { CodeEditor } from './code-editor'
-import { FormatButton } from './format-button'
 import { ViewModeToggle, type ViewMode } from './view-mode-toggle'
 import { LivePreview } from './live-preview'
 import { Textarea } from '@/components/ui/textarea'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 
 export function PasteForm() {
   const router = useRouter()
@@ -58,6 +59,11 @@ export function PasteForm() {
   const content = watch('content')
   const language = watch('language')
 
+  // Hotkey for submission
+  useAppHotkeys('meta+enter, ctrl+enter', () => {
+    handleSubmit(onSubmit)()
+  })
+
   const handleLanguageDetected = (language: string, result: DetectionResult) => {
     setDetectionResult(result)
     // Auto-update language field if confidence is high
@@ -78,6 +84,24 @@ export function PasteForm() {
       })
     }
   }, [viewMode, content, detectionResult])
+
+  // Load draft from localStorage on mount (from Cmd+V in viewer)
+  useEffect(() => {
+    const draft = localStorage.getItem('paste_draft')
+    if (draft) {
+      setValue('content', draft)
+      localStorage.removeItem('paste_draft') // Consume once
+      // Trigger detection for the draft
+      import('@/lib/detection/detector-factory').then(({ DetectorFactory }) => {
+        DetectorFactory.getDetector().then((detector) => {
+          detector.detect(draft).then((result) => {
+            handleLanguageDetected(result.language, result)
+          })
+        })
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleFormat = (formattedCode: string) => {
     setValue('content', formattedCode)
@@ -127,7 +151,6 @@ export function PasteForm() {
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <FileCode className="w-5 h-5" />
           Create New Paste
         </CardTitle>
         <CardDescription>
@@ -147,12 +170,6 @@ export function PasteForm() {
                   onModeChange={setViewMode}
                   disabled={isSubmitting}
                 />
-                <FormatButton
-                  code={content}
-                  language={language}
-                  onFormat={handleFormat}
-                  disabled={isSubmitting}
-                />
               </div>
             </div>
 
@@ -165,6 +182,7 @@ export function PasteForm() {
                 error={errors.content?.message}
                 disabled={isSubmitting}
                 isAuthenticated={false} // TODO: Connect to auth system
+                autoFocus={true}
               />
             )}
 
@@ -187,7 +205,7 @@ export function PasteForm() {
                   <Textarea
                     value={content}
                     onChange={(e) => setValue('content', e.target.value)}
-                    placeholder="Paste your code here..."
+                    placeholder="Paste here..."
                     disabled={isSubmitting}
                     className={`font-mono min-h-[400px] ${errors.content ? 'border-destructive' : ''}`}
                   />
@@ -269,16 +287,25 @@ export function PasteForm() {
           )}
 
           {/* Submit Button */}
-          <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              'Create Paste'
-            )}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Paste'
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Press <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100"><span className="text-xs">⌘</span>Enter</kbd></p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </form>
       </CardContent>
     </Card>

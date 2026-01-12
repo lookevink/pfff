@@ -1,8 +1,6 @@
 import { notFound } from 'next/navigation'
 import { PasteViewer } from '@/components/paste/paste-viewer'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { NewPasteButton } from '@/components/paste/new-paste-button'
 import { pasteService } from '@/lib/services/paste.service'
 import { highlightCode } from '@/lib/highlighting/syntax-highlighter'
 
@@ -26,12 +24,7 @@ export default async function PastePage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-12 px-4">
       <div className="max-w-4xl mx-auto mb-6">
-        <Link href="/">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Plus className="w-4 h-4" />
-            New Paste
-          </Button>
-        </Link>
+        <NewPasteButton />
       </div>
 
       <PasteViewer
