@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { SUPPORTED_LANGUAGES, EXPIRATION_OPTIONS } from '@/lib/schemas/paste.schema'
 import { useAppHotkeys } from '@/hooks/use-app-hotkeys'
+import { addToHistory } from '@/lib/storage/paste-history'
 import type { CreatePasteInput } from '@/lib/schemas/paste.schema'
 import type { DetectionResult } from '@/lib/detection/types'
 import { z } from 'zod'
@@ -34,6 +35,7 @@ import { ViewModeToggle, type ViewMode } from './view-mode-toggle'
 import { LivePreview } from './live-preview'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
+import { Language } from 'highlight.js'
 
 export function PasteForm() {
   const router = useRouter()
@@ -68,7 +70,7 @@ export function PasteForm() {
     setDetectionResult(result)
     // Auto-update language field if confidence is high
     if (result.confidence >= 0.7) {
-      setValue('language', language as any)
+      setValue('language', language as (typeof SUPPORTED_LANGUAGES)[number])
     }
   }
 
@@ -103,10 +105,6 @@ export function PasteForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleFormat = (formattedCode: string) => {
-    setValue('content', formattedCode)
-  }
-
   const onSubmit = async (data: PasteFormInput) => {
     // Convert form data to API format
     const payload: CreatePasteInput = {
@@ -137,6 +135,22 @@ export function PasteForm() {
       if (!response.ok) {
         throw new Error(result.error || 'Failed to create paste')
       }
+
+      // Add to history
+      await addToHistory({
+        slug: result.data.slug,
+        language: data.language,
+        contentPreview: data.content.slice(0, 300),
+        createdAt: result.data.createdAt,
+        viewedAt: new Date().toISOString(),
+        isOwned: true,
+        metadata: {
+          lineCount: data.content.split('\n').length,
+          byteSize: new TextEncoder().encode(data.content).length,
+          detectedLanguage: detectionResult?.language,
+          detectedConfidence: detectionResult?.confidence,
+        },
+      })
 
       // Redirect to paste view
       router.push(`/${result.data.slug}`)
@@ -234,7 +248,7 @@ export function PasteForm() {
               <Label htmlFor="language">Language</Label>
               <Select
                 value={language}
-                onValueChange={(value) => setValue('language', value as any)}
+                onValueChange={(value) => setValue('language', value as (typeof SUPPORTED_LANGUAGES)[number])}
               >
                 <SelectTrigger id="language">
                   <SelectValue placeholder="Select language" />
@@ -257,7 +271,7 @@ export function PasteForm() {
               <Label htmlFor="expiresIn">Expiration</Label>
               <Select
                 defaultValue="7d"
-                onValueChange={(value) => setValue('expiresIn', value as any)}
+                onValueChange={(value) => setValue('expiresIn', value as (typeof EXPIRATION_OPTIONS)[number])}
               >
                 <SelectTrigger id="expiresIn">
                   <SelectValue placeholder="Select expiration" />

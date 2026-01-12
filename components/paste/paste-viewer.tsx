@@ -10,11 +10,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { FileCode, Calendar, Eye, Copy, Check } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PasteApiResponse } from '@/types/paste.types'
 import { CodeDisplay } from './code-display'
 import { useAppHotkeys } from '@/hooks/use-app-hotkeys'
 import { useRouter } from 'next/navigation'
+import { addToHistory } from '@/lib/storage/paste-history'
 // import { useToast } from '@/hooks/use-toast'
 
 type PasteViewerProps = Pick<PasteApiResponse, 'slug' | 'content' | 'language' | 'createdAt' | 'expiresAt' | 'viewCount'> & {
@@ -33,6 +34,22 @@ export function PasteViewer({
   const router = useRouter()
   // const { toast } = useToast() // Commenting out until I find the hook
   const [copied, setCopied] = useState(false)
+
+  // Track paste view on mount
+  useEffect(() => {
+    addToHistory({
+      slug,
+      language,
+      contentPreview: content.slice(0, 300),
+      createdAt,
+      viewedAt: new Date().toISOString(),
+      isOwned: false, // Assume not owned (will be updated if it is)
+      metadata: {
+        lineCount: content.split('\n').length,
+        byteSize: new TextEncoder().encode(content).length,
+      },
+    })
+  }, [slug, language, content, createdAt])
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(content)
