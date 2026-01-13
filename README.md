@@ -2,6 +2,13 @@
 
 A read-heavy code sharing platform built with Next.js 16+ that prioritizes instant retrieval speed, strict security via a "Gatekeeper" pattern, and event-driven AI analysis.
 
+## 📚 Documentation
+
+- **[Features](docs/FEATURES.md)** - Comprehensive inventory of all implemented features with file references
+- **[Architecture](docs/ARCHITECTURE.md)** - Technical deep-dive into system design and patterns
+- **[Changelog](docs/CHANGELOG.md)** - Chronological history of all changes and additions
+- **[Development Guide](CLAUDE.md)** - Guidelines for LLM agents and developers
+
 ## Core Philosophies
 
 1. **Async-First**: User interactions (create/view) are decoupled from heavy processing (AI). The interface must remain snappy regardless of load.
@@ -79,9 +86,29 @@ Direct client-side `INSERT`s are revoked. All writes go through Server Actions u
 ### Collision-Free IDs
 We use Redis atomic increments + Hashids to generate short, unique, and URL-safe IDs (e.g., `x9Lk2`).
 
+## Project Commands
+
+```bash
+# Development
+pnpm dev          # Start development server
+pnpm build        # Build for production
+pnpm start        # Start production server
+pnpm lint         # Run linting
+
+# Documentation
+pnpm docs:sync    # Update documentation timestamps
+```
+
 ## Learn More
 
+### Project Documentation
+- [Features](docs/FEATURES.md) - What's implemented
+- [Architecture](docs/ARCHITECTURE.md) - How it works
+- [Changelog](docs/CHANGELOG.md) - What changed
+
+### External Resources
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Supabase Documentation](https://supabase.com/docs)
 - [Upstash Redis Documentation](https://upstash.com/docs/redis/overall/getstarted)
+- [shadcn/ui Components](https://ui.shadcn.com)
 
